@@ -23,6 +23,16 @@ Avec le taux d'intérêt moyen du jeu de données, un défaut non détecté coû
 
 [Credit Risk Dataset](https://www.kaggle.com/datasets/laotse/credit-risk-dataset) (Kaggle). Les données brutes ne sont pas versionnées : télécharge le CSV et place-le dans `data/raw/`.
 
+## Enseignements sur les données
+
+Analyse exploratoire sur le jeu d'entraînement uniquement (notebook complet : [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb)). Le jeu contient 32 581 lignes ; 165 doublons exacts ont été supprimés avant le découpage stratifié 60/20/20 (21,9 % de défauts dans chaque partie).
+
+- **Signaux forts et non linéaires :** `loan_grade` (10 % de défauts en grade A, 60 % en grade D), `loan_int_rate`, `loan_percent_income` (forte hausse au-delà de 0,25) et `person_income`.
+- **Le grade et le taux d'intérêt se recoupent fortement** (taux médian de 7,5 % en grade A, 20,1 % en grade G), d'où une étude dédiée avec et sans `loan_grade`.
+- **Qualité des données :** valeurs invraisemblables (âges jusqu'à 144 ans, ancienneté jusqu'à 123 ans), 9,5 % de `loan_int_rate` et 2,8 % de `person_emp_length` manquants. Une ancienneté manquante va avec un taux de défaut plus élevé (31,2 % contre 21,6 %).
+
+![Taux de défaut par variable numérique](reports/figures/eda_default_rate_numeric.png)
+
 ## Résultats clés
 
 _À compléter en fin de projet (AUC-ROC, AUC-PR, KS, impact financier estimé)._
@@ -34,11 +44,11 @@ credit-risk-scoring/
 ├── data/            # données brutes et transformées (non versionnées)
 ├── docs/            # dictionnaire des variables, model card
 ├── models/          # modèles sérialisés (non versionnés)
-├── notebooks/       # EDA et expérimentations
+├── notebooks/       # 01_eda, 02_modeling_experiments, 03_evaluation_explainability
 ├── reports/figures/ # figures utilisées dans le README
 ├── scripts/         # scripts utilitaires (inspection des données, etc.)
 ├── src/
-│   ├── data/        # chargement et nettoyage
+│   ├── data/        # chargement, découpage et nettoyage
 │   ├── features/    # prétraitement et feature engineering
 │   ├── models/      # entraînement, évaluation, seuil
 │   └── api/         # service FastAPI
