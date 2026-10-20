@@ -8,8 +8,16 @@ End-to-end credit risk scoring project: exploratory analysis, modeling, probabil
 
 ## Business problem
 
-_To be completed (issue: "Define business problem and cost matrix")._
-A lender must decide whether to grant a loan. Granting a loan that ends in default costs far more than refusing a good customer. The goal is to predict the probability of default and choose a decision threshold that minimizes expected cost.
+A lender must decide whether to grant a loan. Two errors are possible:
+
+- **False negative** (loan granted, borrower defaults): the lender loses part of the principal. Assumed loss given default (LGD): **60% of the loan amount**.
+- **False positive** (good customer refused): the lender loses the expected interest income, approximated by **loan_amnt × loan_int_rate** (one-year proxy).
+
+With the average interest rate in the data, a missed default costs roughly **5 times** more than a wrongly refused customer. Because these assumptions are debatable, results are also reported for other cost ratios (3:1, 5:1, 10:1).
+
+**Goal:** predict the probability of default, then choose the decision threshold that minimizes the expected total cost.
+
+**Metrics:** AUC-PR and KS (ranking quality), Brier score (calibration), expected cost (business impact). Accuracy is not used: a naive model that always predicts "no default" already reaches about 78%.
 
 ## Dataset
 
@@ -28,6 +36,7 @@ credit-risk-scoring/
 ├── models/          # serialized models (not versioned)
 ├── notebooks/       # EDA and experiments
 ├── reports/figures/ # figures used in the README
+├── scripts/         # helper scripts (data inspection, etc.)
 ├── src/
 │   ├── data/        # loading and cleaning
 │   ├── features/    # preprocessing and feature engineering

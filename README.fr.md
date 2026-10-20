@@ -8,8 +8,16 @@ Projet de scoring du risque de crédit de bout en bout : analyse exploratoire, m
 
 ## Problème métier
 
-_À compléter (issue : « Define business problem and cost matrix »)._
-Un prêteur doit décider d'accorder ou non un prêt. Accorder un prêt qui finit en défaut coûte beaucoup plus cher que refuser un bon client. L'objectif est de prédire la probabilité de défaut et de choisir un seuil de décision qui minimise le coût attendu.
+Un prêteur doit décider d'accorder ou non un prêt. Deux erreurs sont possibles :
+
+- **Faux négatif** (prêt accordé, l'emprunteur fait défaut) : le prêteur perd une partie du capital. Perte en cas de défaut (LGD) supposée : **60 % du montant du prêt**.
+- **Faux positif** (bon client refusé) : le prêteur perd les intérêts attendus, approximés par **loan_amnt × loan_int_rate** (approximation sur un an).
+
+Avec le taux d'intérêt moyen du jeu de données, un défaut non détecté coûte environ **5 fois** plus qu'un bon client refusé à tort. Ces hypothèses étant discutables, les résultats sont aussi présentés pour d'autres ratios de coûts (3:1, 5:1, 10:1).
+
+**Objectif :** prédire la probabilité de défaut, puis choisir le seuil de décision qui minimise le coût total attendu.
+
+**Métriques :** AUC-PR et KS (qualité du classement), score de Brier (calibration), coût attendu (impact métier). L'accuracy n'est pas utilisée : un modèle naïf qui prédit toujours « pas de défaut » atteint déjà environ 78 %.
 
 ## Jeu de données
 
@@ -28,6 +36,7 @@ credit-risk-scoring/
 ├── models/          # modèles sérialisés (non versionnés)
 ├── notebooks/       # EDA et expérimentations
 ├── reports/figures/ # figures utilisées dans le README
+├── scripts/         # scripts utilitaires (inspection des données, etc.)
 ├── src/
 │   ├── data/        # chargement et nettoyage
 │   ├── features/    # prétraitement et feature engineering
