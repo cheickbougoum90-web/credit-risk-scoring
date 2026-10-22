@@ -33,6 +33,19 @@ Exploratory analysis on the training set only (full notebook: [`notebooks/01_eda
 
 ![Default rate by numeric variable](reports/figures/eda_default_rate_numeric.png)
 
+## Data cleaning decisions
+
+Decided from the training-set analysis; the deterministic rule is in [`src/data/clean.py`](src/data/clean.py), the imputations are learned inside the preprocessing pipeline so that nothing leaks from validation or test data.
+
+| Topic | Decision | Implemented in |
+|---|---|---|
+| Age above 100, employment length above 60 | Rows removed with the same rule on train, validation and test (6, 1 and 0 rows). The API rejects such inputs. | `src/data/clean.py` |
+| Income above 1,000,000 | Kept; log-transform or robust scaling for linear models | preprocessing pipeline |
+| Missing `person_emp_length` | Median imputation plus a missing-value indicator (31.2% default rate when missing versus 21.6%) | preprocessing pipeline |
+| Missing `loan_int_rate` | Median imputation by `loan_grade`, fitted on train | preprocessing pipeline |
+| `loan_percent_income` | Kept as provided; the recomputed ratio is tested as a feature | feature engineering |
+| `loan_grade` | Kept; compared with and without | dedicated study |
+
 ## Key results
 
 _To be completed at the end of the project (AUC-ROC, AUC-PR, KS, estimated financial impact)._

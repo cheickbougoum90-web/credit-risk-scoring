@@ -33,6 +33,19 @@ Analyse exploratoire sur le jeu d'entraînement uniquement (notebook complet : [
 
 ![Taux de défaut par variable numérique](reports/figures/eda_default_rate_numeric.png)
 
+## Décisions de nettoyage
+
+Décidées à partir de l'analyse du jeu d'entraînement ; la règle déterministe est dans [`src/data/clean.py`](src/data/clean.py), et les imputations sont apprises dans le pipeline de prétraitement pour qu'aucune information de la validation ou du test ne fuite.
+
+| Sujet | Décision | Implémentée dans |
+|---|---|---|
+| Âge supérieur à 100 ans, ancienneté supérieure à 60 ans | Lignes supprimées avec la même règle sur l'entraînement, la validation et le test (6, 1 et 0 lignes). L'API refuse ces valeurs. | `src/data/clean.py` |
+| Revenu supérieur à 1 000 000 | Conservé ; transformation logarithmique ou mise à l'échelle robuste pour les modèles linéaires | pipeline de prétraitement |
+| `person_emp_length` manquant | Imputation par la médiane plus un indicateur de valeur manquante (31,2 % de défauts quand elle manque contre 21,6 %) | pipeline de prétraitement |
+| `loan_int_rate` manquant | Imputation par la médiane du `loan_grade`, calculée sur l'entraînement | pipeline de prétraitement |
+| `loan_percent_income` | Conservé tel quel ; le ratio recalculé est testé comme variable | feature engineering |
+| `loan_grade` | Conservé ; comparé avec et sans | étude dédiée |
+
 ## Résultats clés
 
 _À compléter en fin de projet (AUC-ROC, AUC-PR, KS, impact financier estimé)._
