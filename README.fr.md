@@ -46,6 +46,17 @@ Décidées à partir de l'analyse du jeu d'entraînement ; la règle déterminis
 | `loan_percent_income` | Conservé tel quel ; le ratio recalculé est testé comme variable | feature engineering |
 | `loan_grade` | Conservé ; comparé avec et sans | étude dédiée |
 
+## Comparaison des modèles
+
+Métriques sur le **jeu de validation** (un seul découpage, pas encore d'intervalle de confiance). Le rappel et la précision sont donnés au seuil de 0,5 uniquement à titre de référence ; le seuil optimal en coût est choisi plus tard. Tableau complet : [`reports/model_comparison.csv`](reports/model_comparison.csv).
+
+| Modèle | ROC AUC | PR AUC | KS | Brier | Rappel | Précision |
+|---|---|---|---|---|---|---|
+| prior constant (sans modèle) | 0,500 | 0,219 | 0,000 | 0,171 | 0,000 | 0,000 |
+| régression logistique (baseline) | 0,877 | 0,723 | 0,611 | 0,104 | 0,544 | 0,741 |
+
+![Courbes ROC et précision-rappel de la baseline](reports/figures/baseline_roc_pr.png)
+
 ## Résultats clés
 
 _À compléter en fin de projet (AUC-ROC, AUC-PR, KS, impact financier estimé)._

@@ -1,0 +1,3 @@
+model,split,roc_auc,pr_auc,ks,brier,recall,precision,threshold,notes
+constant prior (no model),validation,0.5,0.2188,0.0,0.1709,0.0,0.0,0.5,same probability for everyone
+logistic regression (baseline),validation,0.8767,0.723,0.6107,0.1036,0.5437,0.7406,0.5,"linear preprocessing, default C=1, no class weights"

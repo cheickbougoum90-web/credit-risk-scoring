@@ -46,6 +46,17 @@ Decided from the training-set analysis; the deterministic rule is in [`src/data/
 | `loan_percent_income` | Kept as provided; the recomputed ratio is tested as a feature | feature engineering |
 | `loan_grade` | Kept; compared with and without | dedicated study |
 
+## Model comparison
+
+Metrics on the **validation set** (single split, no confidence interval yet). Recall and precision are given at a threshold of 0.5 only as a reference; the cost-optimal threshold is chosen later. Full table: [`reports/model_comparison.csv`](reports/model_comparison.csv).
+
+| Model | ROC AUC | PR AUC | KS | Brier | Recall | Precision |
+|---|---|---|---|---|---|---|
+| constant prior (no model) | 0.500 | 0.219 | 0.000 | 0.171 | 0.000 | 0.000 |
+| logistic regression (baseline) | 0.877 | 0.723 | 0.611 | 0.104 | 0.544 | 0.741 |
+
+![Baseline ROC and precision-recall curves](reports/figures/baseline_roc_pr.png)
+
 ## Key results
 
 _To be completed at the end of the project (AUC-ROC, AUC-PR, KS, estimated financial impact)._
