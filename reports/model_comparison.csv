@@ -1,3 +1,4 @@
 model,split,roc_auc,pr_auc,ks,brier,recall,precision,threshold,notes
 constant prior (no model),validation,0.5,0.2188,0.0,0.1709,0.0,0.0,0.5,same probability for everyone
 logistic regression (baseline),validation,0.8767,0.723,0.6107,0.1036,0.5437,0.7406,0.5,"linear preprocessing, default C=1, no class weights"
+logistic + loan_to_income (replaces loan_percent_income),validation,0.8779,0.7261,0.6089,0.1029,0.5501,0.7436,0.5,issue 9: recomputed ratio replaces the provided one (removes the leakage artifact)

@@ -31,6 +31,8 @@ Exploratory analysis on the training set only (full notebook: [`notebooks/01_eda
 - **Grade and interest rate overlap heavily** (median rate 7.5% in grade A, 20.1% in grade G), hence a dedicated with/without `loan_grade` study.
 - **Data quality:** implausible values (ages up to 144, employment length up to 123 years), 9.5% of `loan_int_rate` and 2.8% of `person_emp_length` missing. Missing employment length goes with a higher default rate (31.2% versus 21.6%).
 
+- **Data artifact (target leakage):** in the training set, the provided `loan_percent_income` differs from `loan_amnt / person_income` on 211 rows (1.1%), and **all of them are defaults**. The model therefore uses the recomputed ratio `loan_to_income` instead (see below).
+
 ![Default rate by numeric variable](reports/figures/eda_default_rate_numeric.png)
 
 ## Data cleaning decisions
@@ -43,7 +45,7 @@ Decided from the training-set analysis; the deterministic rule is in [`src/data/
 | Income above 1,000,000 | Kept; log-transform or robust scaling for linear models | preprocessing pipeline |
 | Missing `person_emp_length` | Median imputation plus a missing-value indicator (31.2% default rate when missing versus 21.6%) | preprocessing pipeline |
 | Missing `loan_int_rate` | Median imputation by `loan_grade`, fitted on train | preprocessing pipeline |
-| `loan_percent_income` | Kept as provided; the recomputed ratio is tested as a feature | feature engineering |
+| `loan_percent_income` | Replaced by the recomputed ratio `loan_to_income`: the provided ratio differs on 1.1% of training rows, all defaults (a leakage artifact of the dataset). Those rows are kept, not deleted. | `src/features/engineering.py` |
 | `loan_grade` | Kept; compared with and without | dedicated study |
 
 ## Model comparison
@@ -54,6 +56,9 @@ Metrics on the **validation set** (single split, no confidence interval yet). Re
 |---|---|---|---|---|---|---|
 | constant prior (no model) | 0.500 | 0.219 | 0.000 | 0.171 | 0.000 | 0.000 |
 | logistic regression (baseline) | 0.877 | 0.723 | 0.611 | 0.104 | 0.544 | 0.741 |
+| logistic + `loan_to_income` (replaces `loan_percent_income`) | 0.878 | 0.726 | 0.609 | 0.103 | 0.550 | 0.744 |
+
+Feature selection was cross-validated on the training set only (5 folds, logistic regression and gradient boosting). Of four candidate features, only the recomputed ratio replacing the provided one was kept; adding it next to the provided ratio would have let the model read the leak above (details in [`notebooks/02_modeling_experiments.ipynb`](notebooks/02_modeling_experiments.ipynb), section 3). The differences between the two logistic models are small and come from a single validation split.
 
 ![Baseline ROC and precision-recall curves](reports/figures/baseline_roc_pr.png)
 

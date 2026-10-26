@@ -31,6 +31,8 @@ Analyse exploratoire sur le jeu d'entraînement uniquement (notebook complet : [
 - **Le grade et le taux d'intérêt se recoupent fortement** (taux médian de 7,5 % en grade A, 20,1 % en grade G), d'où une étude dédiée avec et sans `loan_grade`.
 - **Qualité des données :** valeurs invraisemblables (âges jusqu'à 144 ans, ancienneté jusqu'à 123 ans), 9,5 % de `loan_int_rate` et 2,8 % de `person_emp_length` manquants. Une ancienneté manquante va avec un taux de défaut plus élevé (31,2 % contre 21,6 %).
 
+- **Artefact de données (fuite de la cible) :** dans le jeu d'entraînement, `loan_percent_income` fourni diffère de `loan_amnt / person_income` sur 211 lignes (1,1 %), et **toutes sont des défauts**. Le modèle utilise donc le ratio recalculé `loan_to_income` à la place (voir plus bas).
+
 ![Taux de défaut par variable numérique](reports/figures/eda_default_rate_numeric.png)
 
 ## Décisions de nettoyage
@@ -43,7 +45,7 @@ Décidées à partir de l'analyse du jeu d'entraînement ; la règle déterminis
 | Revenu supérieur à 1 000 000 | Conservé ; transformation logarithmique ou mise à l'échelle robuste pour les modèles linéaires | pipeline de prétraitement |
 | `person_emp_length` manquant | Imputation par la médiane plus un indicateur de valeur manquante (31,2 % de défauts quand elle manque contre 21,6 %) | pipeline de prétraitement |
 | `loan_int_rate` manquant | Imputation par la médiane du `loan_grade`, calculée sur l'entraînement | pipeline de prétraitement |
-| `loan_percent_income` | Conservé tel quel ; le ratio recalculé est testé comme variable | feature engineering |
+| `loan_percent_income` | Remplacé par le ratio recalculé `loan_to_income` : le ratio fourni diffère sur 1,1 % des lignes d'entraînement, toutes des défauts (artefact de fuite du jeu de données). Ces lignes sont conservées, pas supprimées. | `src/features/engineering.py` |
 | `loan_grade` | Conservé ; comparé avec et sans | étude dédiée |
 
 ## Comparaison des modèles
@@ -54,6 +56,9 @@ Métriques sur le **jeu de validation** (un seul découpage, pas encore d'interv
 |---|---|---|---|---|---|---|
 | prior constant (sans modèle) | 0,500 | 0,219 | 0,000 | 0,171 | 0,000 | 0,000 |
 | régression logistique (baseline) | 0,877 | 0,723 | 0,611 | 0,104 | 0,544 | 0,741 |
+| logistique + `loan_to_income` (remplace `loan_percent_income`) | 0,878 | 0,726 | 0,609 | 0,103 | 0,550 | 0,744 |
+
+La sélection des variables a été validée par validation croisée sur le jeu d'entraînement uniquement (5 plis, régression logistique et gradient boosting). Sur quatre variables candidates, seul le ratio recalculé en remplacement du ratio fourni a été retenu ; l'ajouter à côté du ratio fourni aurait permis au modèle de lire la fuite décrite plus haut (détails dans [`notebooks/02_modeling_experiments.ipynb`](notebooks/02_modeling_experiments.ipynb), section 3). Les écarts entre les deux modèles logistiques sont faibles et viennent d'un seul découpage de validation.
 
 ![Courbes ROC et précision-rappel de la baseline](reports/figures/baseline_roc_pr.png)
 

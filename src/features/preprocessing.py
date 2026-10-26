@@ -32,6 +32,13 @@ from sklearn.preprocessing import (
 from sklearn.utils.validation import check_is_fitted
 
 from src.data.load import TARGET
+from src.features.engineering import (
+    BINARY_ENGINEERED,
+    ENGINEERED_FEATURES,
+    SELECTED_DROP,
+    SELECTED_ENGINEERED,
+    FeatureEngineer,
+)
 
 NUMERIC_COLS = [
     "person_age",
@@ -112,11 +119,13 @@ def _missing_flag_names(transformer, input_features):
     return [f"{name}_missing" for name in input_features]
 
 
-def build_preprocessor(model_family: str = "tree") -> Pipeline:
+def build_preprocessor(model_family: str = "tree", engineered=(), drop=()) -> Pipeline:
     """Build the (unfitted) preprocessing pipeline.
 
     model_family="tree": raw numeric scales (trees are scale-invariant).
     model_family="linear": log1p on income and standard scaling of numerics.
+    engineered: names of engineered features to add (see src/features/engineering.py).
+    drop: generic numeric columns to remove (e.g. ["loan_percent_income"]).
     """
     if model_family not in MODEL_FAMILIES:
         raise ValueError(f"model_family must be one of {MODEL_FAMILIES}, got {model_family!r}")
@@ -137,7 +146,18 @@ def build_preprocessor(model_family: str = "tree") -> Pipeline:
     if scale:
         emp_steps.append(("scale", StandardScaler()))
 
-    other_numeric = [c for c in NUMERIC_COLS if c not in ("person_income", "person_emp_length")]
+    generic_numeric = [c for c in NUMERIC_COLS if c not in ("person_income", "person_emp_length")]
+    bad_drop = set(drop) - set(generic_numeric)
+    if bad_drop:
+        raise ValueError(f"Cannot drop {sorted(bad_drop)}; allowed: {generic_numeric}")
+    unknown = set(engineered) - set(ENGINEERED_FEATURES)
+    if unknown:
+        raise ValueError(f"Unknown engineered features: {sorted(unknown)}")
+    engineered = tuple(f for f in ENGINEERED_FEATURES if f in set(engineered))
+    other_numeric = [c for c in generic_numeric if c not in drop] + [
+        f for f in engineered if f not in BINARY_ENGINEERED
+    ]
+    binary_engineered = [f for f in engineered if f in BINARY_ENGINEERED]
 
     columns = ColumnTransformer(
         transformers=[
@@ -149,6 +169,7 @@ def build_preprocessor(model_family: str = "tree") -> Pipeline:
                 ["person_emp_length"],
             ),
             ("numeric", StandardScaler() if scale else "passthrough", other_numeric),
+            *([("engineered_binary", "passthrough", binary_engineered)] if binary_engineered else []),
             (
                 "ordinal",
                 OrdinalEncoder(categories=[GRADE_ORDER, DEFAULT_FLAG_ORDER]),
@@ -164,9 +185,20 @@ def build_preprocessor(model_family: str = "tree") -> Pipeline:
         verbose_feature_names_out=False,
     )
 
-    pipe = Pipeline([("rate_imputer", GroupMedianImputer()), ("columns", columns)])
+    pipe = Pipeline(
+        [
+            ("rate_imputer", GroupMedianImputer()),
+            ("engineer", FeatureEngineer(features=engineered)),
+            ("columns", columns),
+        ]
+    )
     pipe.set_output(transform="pandas")
     return pipe
+
+
+def build_selected_preprocessor(model_family: str = "tree") -> Pipeline:
+    """Preprocessing with the feature set selected in issue #9 (the one to use from now on)."""
+    return build_preprocessor(model_family, engineered=SELECTED_ENGINEERED, drop=SELECTED_DROP)
 
 
 def save_preprocessor(pipe: Pipeline, path: Path) -> None:

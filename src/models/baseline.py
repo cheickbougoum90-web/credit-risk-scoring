@@ -11,11 +11,13 @@ from src.features.preprocessing import build_preprocessor
 RANDOM_STATE = 42
 
 
-def build_baseline(C: float = 1.0, random_state: int = RANDOM_STATE) -> Pipeline:
+def build_baseline(
+    C: float = 1.0, random_state: int = RANDOM_STATE, engineered=(), drop=()
+) -> Pipeline:
     """Unfitted pipeline: linear preprocessing + logistic regression."""
     return Pipeline(
         [
-            ("preprocess", build_preprocessor("linear")),
+            ("preprocess", build_preprocessor("linear", engineered=engineered, drop=drop)),
             ("model", LogisticRegression(C=C, max_iter=1000, random_state=random_state)),
         ]
     )
