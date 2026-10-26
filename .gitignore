@@ -24,3 +24,6 @@ mlruns/
 .DS_Store
 .idea/
 .vscode/
+
+# pytest temporary directory
+.pytest_tmp/
