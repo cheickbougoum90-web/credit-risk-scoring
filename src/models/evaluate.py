@@ -12,6 +12,7 @@ from sklearn.metrics import (
     average_precision_score,
     brier_score_loss,
     confusion_matrix,
+    precision_recall_curve,
     precision_score,
     recall_score,
     roc_auc_score,
@@ -68,6 +69,15 @@ def classification_metrics(y_true, y_score, threshold: float = 0.5) -> dict:
         "fn": int(fn),
         "tp": int(tp),
     }
+
+
+def precision_at_recall(y_true, y_score, recall_target: float = 0.8) -> float:
+    """Best precision reachable while keeping recall >= recall_target (threshold-free operating point)."""
+    y_true, y_score = _validate(y_true, y_score)
+    if not 0 < recall_target <= 1:
+        raise ValueError("recall_target must be in (0, 1]")
+    precision, recall, _ = precision_recall_curve(y_true, y_score)
+    return float(precision[recall >= recall_target].max())
 
 
 def update_comparison_table(

@@ -57,10 +57,42 @@ Metrics on the **validation set** (single split, no confidence interval yet). Re
 | constant prior (no model) | 0.500 | 0.219 | 0.000 | 0.171 | 0.000 | 0.000 |
 | logistic regression (baseline) | 0.877 | 0.723 | 0.611 | 0.104 | 0.544 | 0.741 |
 | logistic + `loan_to_income` (replaces `loan_percent_income`) | 0.878 | 0.726 | 0.609 | 0.103 | 0.550 | 0.744 |
+| LightGBM (default settings) | 0.946 | 0.905 | 0.759 | 0.051 | 0.752 | 0.954 |
 
 Feature selection was cross-validated on the training set only (5 folds, logistic regression and gradient boosting). Of four candidate features, only the recomputed ratio replacing the provided one was kept; adding it next to the provided ratio would have let the model read the leak above (details in [`notebooks/02_modeling_experiments.ipynb`](notebooks/02_modeling_experiments.ipynb), section 3). The differences between the two logistic models are small and come from a single validation split.
 
 ![Baseline ROC and precision-recall curves](reports/figures/baseline_roc_pr.png)
+
+### Cross-validation on the training set (issue #10)
+
+5-fold stratified cross-validation, mean ± standard deviation across folds, same folds for every model, near-default hyperparameters (no tuning, no class weights) and the features selected above. Full table: [`reports/cv_comparison.csv`](reports/cv_comparison.csv).
+
+| Model | PR AUC | ROC AUC | KS | Brier |
+|---|---|---|---|---|
+| XGBoost | 0.900 ± 0.004 | 0.946 ± 0.002 | 0.750 ± 0.008 | 0.054 ± 0.002 |
+| LightGBM | 0.900 ± 0.004 | 0.944 ± 0.001 | 0.752 ± 0.012 | 0.054 ± 0.002 |
+| Random Forest | 0.884 ± 0.005 | 0.932 ± 0.002 | 0.735 ± 0.015 | 0.059 ± 0.002 |
+| decision tree (depth 5, diagnostic) | 0.824 ± 0.008 | 0.892 ± 0.005 | 0.679 ± 0.015 | 0.067 ± 0.003 |
+| logistic regression | 0.709 ± 0.018 | 0.867 ± 0.008 | 0.583 ± 0.017 | 0.107 ± 0.003 |
+
+![Model comparison](reports/figures/model_cv_comparison.png)
+
+XGBoost and LightGBM are equivalent (paired PR AUC difference +0.0002, standard deviation 0.0018); **LightGBM was chosen** because it fits slightly faster, and XGBoost stays an alternative to revisit at tuning time. Both beat the logistic regression on every fold. Re-running the tree models with the original features (including the leaky ratio) changed nothing meaningful, so the trees do not exploit that artifact. These scores are very high for credit scoring and probably reflect how this public dataset was built (see Limitations). The LightGBM row in the validation table above is a single evaluation on the validation set; recall and precision are at the 0.5 reference threshold.
+
+### Class imbalance (issue #11)
+
+Class weights (`balanced`) and SMOTE-NC (1:1, applied only to the training part of each fold) were compared with the unweighted models, by 5-fold cross-validation on the training set. Full table: [`reports/imbalance_comparison.csv`](reports/imbalance_comparison.csv).
+
+| Model | Strategy | PR AUC | Brier | Mean predicted probability | Recall at 0.5 | Precision at 0.5 |
+|---|---|---|---|---|---|---|
+| LightGBM | none | 0.900 | 0.054 | 0.208 | 0.731 | 0.957 |
+| LightGBM | class weights | 0.897 | 0.061 | 0.260 | 0.771 | 0.862 |
+| LightGBM | SMOTE-NC | 0.897 | 0.055 | 0.215 | 0.733 | 0.943 |
+| Logistic regression | none | 0.709 | 0.107 | 0.219 | 0.517 | 0.747 |
+| Logistic regression | class weights | 0.704 | 0.146 | 0.384 | 0.787 | 0.512 |
+| Logistic regression | SMOTE-NC | 0.701 | 0.141 | 0.366 | 0.768 | 0.526 |
+
+The default rate is 21.9%. Neither strategy improves the ranking quality (PR AUC is lower, with no fold improving) and both degrade the probabilities (Brier score, mean predicted probability). They only move the operating point at the 0.5 threshold: an unweighted LightGBM reaches the same recall as the class-weighted one (0.771) with a threshold of 0.31 and a better precision (0.874 versus 0.862). **The models therefore stay unweighted**; the imbalance is handled by probability calibration and by a cost-based decision threshold (later issues). Class weighting can be revisited as a hyperparameter at tuning time; XGBoost was not tested.
 
 ## Key results
 
@@ -87,15 +119,20 @@ credit-risk-scoring/
 ## Getting started
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
-make install
-make test
+python -m venv .venv                # or: conda create -n credit-risk python=3.12
+source .venv/bin/activate           # Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m pytest -q                 # no test needs the dataset
 ```
+
+To reproduce the notebooks, download the dataset into `data/raw/` (see above) and run `notebooks/01_eda.ipynb`, then `notebooks/02_modeling_experiments.ipynb`. `make install` and `make test` do the same on systems with `make`.
 
 ## Limitations
 
-_To be completed (for example: dataset likely synthetic, no temporal information, no real-world validation)._
+- **The dataset looks synthetic.** A construction artifact is documented above (a ratio that differs only on defaults), and the scores are very high (ROC AUC around 0.95). Such performance should not be expected on a real portfolio.
+- **No temporal information:** no out-of-time validation is possible. Validation numbers come from a single stratified split; cross-validation on the training set gives a spread across folds, not an external check.
+- **Cost assumptions** (loss given default of 60%) are assumptions; the decision threshold is not optimized yet.
+- **Models are not yet tuned or calibrated** (later issues); class weights and SMOTE were tested and not kept. Fairness has not been analyzed yet.
 
 ## License
 

@@ -57,10 +57,42 @@ Métriques sur le **jeu de validation** (un seul découpage, pas encore d'interv
 | prior constant (sans modèle) | 0,500 | 0,219 | 0,000 | 0,171 | 0,000 | 0,000 |
 | régression logistique (baseline) | 0,877 | 0,723 | 0,611 | 0,104 | 0,544 | 0,741 |
 | logistique + `loan_to_income` (remplace `loan_percent_income`) | 0,878 | 0,726 | 0,609 | 0,103 | 0,550 | 0,744 |
+| LightGBM (réglages par défaut) | 0,946 | 0,905 | 0,759 | 0,051 | 0,752 | 0,954 |
 
 La sélection des variables a été validée par validation croisée sur le jeu d'entraînement uniquement (5 plis, régression logistique et gradient boosting). Sur quatre variables candidates, seul le ratio recalculé en remplacement du ratio fourni a été retenu ; l'ajouter à côté du ratio fourni aurait permis au modèle de lire la fuite décrite plus haut (détails dans [`notebooks/02_modeling_experiments.ipynb`](notebooks/02_modeling_experiments.ipynb), section 3). Les écarts entre les deux modèles logistiques sont faibles et viennent d'un seul découpage de validation.
 
 ![Courbes ROC et précision-rappel de la baseline](reports/figures/baseline_roc_pr.png)
+
+### Validation croisée sur le jeu d'entraînement (issue #10)
+
+Validation croisée stratifiée à 5 plis, moyenne ± écart-type entre les plis, mêmes plis pour tous les modèles, hyperparamètres proches des valeurs par défaut (ni réglage, ni pondération des classes) et variables sélectionnées ci-dessus. Tableau complet : [`reports/cv_comparison.csv`](reports/cv_comparison.csv).
+
+| Modèle | PR AUC | ROC AUC | KS | Brier |
+|---|---|---|---|---|
+| XGBoost | 0,900 ± 0,004 | 0,946 ± 0,002 | 0,750 ± 0,008 | 0,054 ± 0,002 |
+| LightGBM | 0,900 ± 0,004 | 0,944 ± 0,001 | 0,752 ± 0,012 | 0,054 ± 0,002 |
+| Random Forest | 0,884 ± 0,005 | 0,932 ± 0,002 | 0,735 ± 0,015 | 0,059 ± 0,002 |
+| arbre de décision (profondeur 5, diagnostic) | 0,824 ± 0,008 | 0,892 ± 0,005 | 0,679 ± 0,015 | 0,067 ± 0,003 |
+| régression logistique | 0,709 ± 0,018 | 0,867 ± 0,008 | 0,583 ± 0,017 | 0,107 ± 0,003 |
+
+![Comparaison des modèles](reports/figures/model_cv_comparison.png)
+
+XGBoost et LightGBM sont équivalents (écart apparié de PR AUC +0,0002, écart-type 0,0018) ; **LightGBM a été choisi** car il s'entraîne un peu plus vite, et XGBoost reste une alternative à revoir au moment du réglage. Les deux dépassent la régression logistique sur chaque pli. Relancer les modèles à arbres avec les variables d'origine (ratio fuyant inclus) n'a rien changé de significatif : les arbres n'exploitent pas cet artefact. Ces scores sont très élevés pour du scoring de crédit et reflètent probablement la construction de ce jeu de données public (voir Limites). La ligne LightGBM du tableau de validation ci-dessus est une évaluation unique sur le jeu de validation ; rappel et précision sont donnés au seuil de référence 0,5.
+
+### Déséquilibre des classes (issue #11)
+
+Les poids de classes (`balanced`) et SMOTE-NC (1:1, appliqué uniquement à la partie entraînement de chaque pli) ont été comparés aux modèles non pondérés, par validation croisée à 5 plis sur le jeu d'entraînement. Tableau complet : [`reports/imbalance_comparison.csv`](reports/imbalance_comparison.csv).
+
+| Modèle | Stratégie | PR AUC | Brier | Probabilité moyenne prédite | Rappel à 0,5 | Précision à 0,5 |
+|---|---|---|---|---|---|---|
+| LightGBM | aucune | 0,900 | 0,054 | 0,208 | 0,731 | 0,957 |
+| LightGBM | poids de classes | 0,897 | 0,061 | 0,260 | 0,771 | 0,862 |
+| LightGBM | SMOTE-NC | 0,897 | 0,055 | 0,215 | 0,733 | 0,943 |
+| Régression logistique | aucune | 0,709 | 0,107 | 0,219 | 0,517 | 0,747 |
+| Régression logistique | poids de classes | 0,704 | 0,146 | 0,384 | 0,787 | 0,512 |
+| Régression logistique | SMOTE-NC | 0,701 | 0,141 | 0,366 | 0,768 | 0,526 |
+
+Le taux de défaut est de 21,9 %. Aucune des deux stratégies n'améliore la qualité du classement (la PR AUC est plus basse, sans qu'aucun pli ne s'améliore) et les deux dégradent les probabilités (score de Brier, probabilité moyenne prédite). Elles déplacent seulement le point de fonctionnement au seuil de 0,5 : un LightGBM non pondéré atteint le même rappel que la version pondérée (0,771) avec un seuil de 0,31 et une meilleure précision (0,874 contre 0,862). **Les modèles restent donc non pondérés** ; le déséquilibre est traité par la calibration des probabilités et par un seuil de décision fondé sur les coûts (issues suivantes). La pondération pourra être revue comme hyperparamètre au réglage ; XGBoost n'a pas été testé.
 
 ## Résultats clés
 
@@ -87,15 +119,20 @@ credit-risk-scoring/
 ## Démarrage
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate      # Windows : .venv\Scripts\activate
-make install
-make test
+python -m venv .venv                # ou : conda create -n credit-risk python=3.12
+source .venv/bin/activate           # Windows PowerShell : .venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m pytest -q                 # aucun test n'a besoin du jeu de données
 ```
+
+Pour reproduire les notebooks, télécharge le jeu de données dans `data/raw/` (voir plus haut) puis lance `notebooks/01_eda.ipynb`, ensuite `notebooks/02_modeling_experiments.ipynb`. `make install` et `make test` font la même chose sur les systèmes disposant de `make`.
 
 ## Limites
 
-_À compléter (par exemple : jeu de données probablement synthétique, pas d'information temporelle, pas de validation en conditions réelles)._
+- **Le jeu de données semble synthétique.** Un artefact de construction est documenté plus haut (un ratio qui diffère uniquement sur les défauts), et les scores sont très élevés (ROC AUC autour de 0,95). Une telle performance n'est pas à attendre sur un portefeuille réel.
+- **Pas d'information temporelle :** aucune validation hors période n'est possible. Les chiffres de validation viennent d'un seul découpage stratifié ; la validation croisée sur l'entraînement donne une dispersion entre plis, pas un contrôle externe.
+- **Les hypothèses de coûts** (perte en cas de défaut de 60 %) sont des hypothèses ; le seuil de décision n'est pas encore optimisé.
+- **Les modèles ne sont pas encore réglés ni calibrés** (issues suivantes) ; la pondération des classes et SMOTE ont été testés et non retenus. L'équité n'a pas encore été analysée.
 
 ## Licence
 

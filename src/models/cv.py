@@ -4,6 +4,8 @@ All folds are built from the TRAINING set only. Using the same folds
 (same seed) for every candidate makes the fold-by-fold differences paired,
 which is more informative than comparing two means.
 """
+import time
+
 import numpy as np
 import pandas as pd
 from sklearn.base import clone
@@ -17,16 +19,33 @@ RANDOM_STATE = 42
 
 
 def cross_validate_model(
-    estimator, X: pd.DataFrame, y: pd.Series, n_splits: int = N_SPLITS, random_state: int = RANDOM_STATE
+    estimator,
+    X: pd.DataFrame,
+    y: pd.Series,
+    n_splits: int = N_SPLITS,
+    random_state: int = RANDOM_STATE,
+    record_time: bool = False,
+    extra: dict | None = None,
 ) -> pd.DataFrame:
-    """Return one row of metrics per fold. The estimator is cloned and refitted on each fold."""
+    """Return one row of metrics per fold. The estimator is cloned and refitted on each fold.
+
+    With record_time=True a `fit_seconds` column is added (not reproducible, hence optional).
+    `extra` maps a column name to a function (y_true, scores) -> float computed on each validation fold.
+    """
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
     rows = []
     for fold, (tr, va) in enumerate(skf.split(X, y)):
+        t0 = time.perf_counter()
         model = clone(estimator).fit(X.iloc[tr], y.iloc[tr])
+        elapsed = time.perf_counter() - t0
         scores = model.predict_proba(X.iloc[va])[:, 1]
         m = classification_metrics(y.iloc[va], scores)
-        rows.append({"fold": fold, **{k: m[k] for k in CV_METRICS}})
+        row = {"fold": fold, **{k: m[k] for k in CV_METRICS}}
+        for name, fn in (extra or {}).items():
+            row[name] = float(fn(y.iloc[va], scores))
+        if record_time:
+            row["fit_seconds"] = elapsed
+        rows.append(row)
     return pd.DataFrame(rows)
 
 
@@ -51,3 +70,35 @@ def paired_gain(baseline: pd.DataFrame, candidate: pd.DataFrame, metric: str = "
         "folds_improved": int((diff > 0).sum()),
         "n_folds": int(len(diff)),
     }
+
+
+def cv_comparison_table(results: dict) -> pd.DataFrame:
+    """One row per model with the mean and sample std of each metric over the folds.
+
+    `results` maps a model name to the DataFrame returned by cross_validate_model.
+    Rows are sorted by decreasing mean PR AUC.
+    """
+    rows = {}
+    for name, scores in results.items():
+        s = summarize(scores)
+        row = {}
+        for metric in s.index:
+            row[f"{metric}_mean"] = s.loc[metric, "mean"]
+            row[f"{metric}_std"] = s.loc[metric, "std"]
+        if "fit_seconds" in scores.columns:
+            row["fit_seconds_mean"] = scores["fit_seconds"].mean()
+        rows[name] = row
+    table = pd.DataFrame(rows).T
+    return table.sort_values("pr_auc_mean", ascending=False)
+
+
+def cv_table_to_markdown(table: pd.DataFrame) -> str:
+    """Markdown table of 'mean +/- std' for the main metrics (for the README)."""
+    lines = [
+        "| Model | PR AUC | ROC AUC | KS | Brier |",
+        "|---|---|---|---|---|",
+    ]
+    for name, r in table.iterrows():
+        cells = [f"{r[f'{m}_mean']:.3f} ± {r[f'{m}_std']:.3f}" for m in ("pr_auc", "roc_auc", "ks", "brier")]
+        lines.append(f"| {name} | " + " | ".join(cells) + " |")
+    return "\n".join(lines)
