@@ -22,6 +22,8 @@ pytest>=8.0
 httpx>=0.27
 ruff>=0.4
 
+# Hyperparameter tuning
+optuna>=3.6
+
 # Optional (see issues labeled "optional")
 # mlflow>=2.12
-# optuna>=3.6

@@ -58,6 +58,7 @@ Metrics on the **validation set** (single split, no confidence interval yet). Re
 | logistic regression (baseline) | 0.877 | 0.723 | 0.611 | 0.104 | 0.544 | 0.741 |
 | logistic + `loan_to_income` (replaces `loan_percent_income`) | 0.878 | 0.726 | 0.609 | 0.103 | 0.550 | 0.744 |
 | LightGBM (default settings) | 0.946 | 0.905 | 0.759 | 0.051 | 0.752 | 0.954 |
+| LightGBM (tuned, not adopted) | 0.948 | 0.907 | 0.765 | 0.051 | 0.750 | 0.966 |
 
 Feature selection was cross-validated on the training set only (5 folds, logistic regression and gradient boosting). Of four candidate features, only the recomputed ratio replacing the provided one was kept; adding it next to the provided ratio would have let the model read the leak above (details in [`notebooks/02_modeling_experiments.ipynb`](notebooks/02_modeling_experiments.ipynb), section 3). The differences between the two logistic models are small and come from a single validation split.
 
@@ -92,7 +93,22 @@ Class weights (`balanced`) and SMOTE-NC (1:1, applied only to the training part 
 | Logistic regression | class weights | 0.704 | 0.146 | 0.384 | 0.787 | 0.512 |
 | Logistic regression | SMOTE-NC | 0.701 | 0.141 | 0.366 | 0.768 | 0.526 |
 
-The default rate is 21.9%. Neither strategy improves the ranking quality (PR AUC is lower, with no fold improving) and both degrade the probabilities (Brier score, mean predicted probability). They only move the operating point at the 0.5 threshold: an unweighted LightGBM reaches the same recall as the class-weighted one (0.771) with a threshold of 0.31 and a better precision (0.874 versus 0.862). **The models therefore stay unweighted**; the imbalance is handled by probability calibration and by a cost-based decision threshold (later issues). Class weighting can be revisited as a hyperparameter at tuning time; XGBoost was not tested.
+The default rate is 21.9%. Neither strategy improves the ranking quality (PR AUC is lower, with no fold improving) and both degrade the probabilities (Brier score, mean predicted probability). They only move the operating point at the 0.5 threshold: an unweighted LightGBM reaches the same recall as the class-weighted one (0.771) with a threshold of 0.31 and a better precision (0.874 versus 0.862). **The models therefore stay unweighted**; the imbalance is handled by probability calibration and by a cost-based decision threshold (later issues). Class weighting was also offered to the hyperparameter search (see below); XGBoost was not tested.
+
+### Hyperparameter tuning (issue #13)
+
+Optuna search for the chosen LightGBM: 40 trials (seeded TPE sampler, first trial close to the default configuration), objective = mean PR AUC of the same 5 folds of the training set. Script: [`scripts/tune_lightgbm.py`](scripts/tune_lightgbm.py); results in [`reports/tuning/`](reports/tuning/). Search space: number of trees (100 to 600), learning rate (0.02 to 0.2), leaves (8 to 96), minimum samples per leaf (5 to 80), row and column subsampling, L1/L2 regularization and class weights.
+
+| | PR AUC |
+|---|---|
+| default LightGBM (cross-validation, same folds) | 0.8998 |
+| best trial of the search (same folds) | 0.9020 |
+| paired gain on fresh folds (seeds 7 and 123) | +0.0021 and +0.0021 (noise 0.0035 and 0.0038) |
+| validation set, default / tuned | 0.9049 / 0.9071 |
+
+The 8 best trials form a plateau (0.9006 to 0.9020), and the best of 40 is optimistically biased, so the gain was measured again on folds the search had not used: +0.0021, smaller than the standard deviation of the paired differences. By the adoption rule used throughout the project, **the default LightGBM is kept**; the tuned parameters stay saved in [`reports/tuning/lightgbm_best_params.json`](reports/tuning/lightgbm_best_params.json). Hyperparameters matter little on this dataset. The validation set was used a second time, for these two models only.
+
+![Optuna search history](reports/figures/tuning_history.png)
 
 ## Key results
 
@@ -132,7 +148,7 @@ To reproduce the notebooks, download the dataset into `data/raw/` (see above) an
 - **The dataset looks synthetic.** A construction artifact is documented above (a ratio that differs only on defaults), and the scores are very high (ROC AUC around 0.95). Such performance should not be expected on a real portfolio.
 - **No temporal information:** no out-of-time validation is possible. Validation numbers come from a single stratified split; cross-validation on the training set gives a spread across folds, not an external check.
 - **Cost assumptions** (loss given default of 60%) are assumptions; the decision threshold is not optimized yet.
-- **Models are not yet tuned or calibrated** (later issues); class weights and SMOTE were tested and not kept. Fairness has not been analyzed yet.
+- **Probabilities are not calibrated yet** (next issue); class weights, SMOTE and hyperparameter tuning were tested and not kept. Fairness has not been analyzed yet.
 
 ## License
 

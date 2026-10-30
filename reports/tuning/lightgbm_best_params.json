@@ -1,0 +1,15 @@
+{
+  "best_value_pr_auc": 0.9020436723307791,
+  "best_trial": 32,
+  "params": {
+    "n_estimators": 492,
+    "learning_rate": 0.1025429224789998,
+    "num_leaves": 10,
+    "min_child_samples": 27,
+    "subsample": 0.8885692881399201,
+    "colsample_bytree": 0.7491022390305774,
+    "reg_alpha": 0.04932600130275184,
+    "reg_lambda": 0.31888669575677525,
+    "class_weight": null
+  }
+}

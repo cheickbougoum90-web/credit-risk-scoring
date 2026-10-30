@@ -58,6 +58,7 @@ Métriques sur le **jeu de validation** (un seul découpage, pas encore d'interv
 | régression logistique (baseline) | 0,877 | 0,723 | 0,611 | 0,104 | 0,544 | 0,741 |
 | logistique + `loan_to_income` (remplace `loan_percent_income`) | 0,878 | 0,726 | 0,609 | 0,103 | 0,550 | 0,744 |
 | LightGBM (réglages par défaut) | 0,946 | 0,905 | 0,759 | 0,051 | 0,752 | 0,954 |
+| LightGBM (réglé, non retenu) | 0,948 | 0,907 | 0,765 | 0,051 | 0,750 | 0,966 |
 
 La sélection des variables a été validée par validation croisée sur le jeu d'entraînement uniquement (5 plis, régression logistique et gradient boosting). Sur quatre variables candidates, seul le ratio recalculé en remplacement du ratio fourni a été retenu ; l'ajouter à côté du ratio fourni aurait permis au modèle de lire la fuite décrite plus haut (détails dans [`notebooks/02_modeling_experiments.ipynb`](notebooks/02_modeling_experiments.ipynb), section 3). Les écarts entre les deux modèles logistiques sont faibles et viennent d'un seul découpage de validation.
 
@@ -92,7 +93,22 @@ Les poids de classes (`balanced`) et SMOTE-NC (1:1, appliqué uniquement à la p
 | Régression logistique | poids de classes | 0,704 | 0,146 | 0,384 | 0,787 | 0,512 |
 | Régression logistique | SMOTE-NC | 0,701 | 0,141 | 0,366 | 0,768 | 0,526 |
 
-Le taux de défaut est de 21,9 %. Aucune des deux stratégies n'améliore la qualité du classement (la PR AUC est plus basse, sans qu'aucun pli ne s'améliore) et les deux dégradent les probabilités (score de Brier, probabilité moyenne prédite). Elles déplacent seulement le point de fonctionnement au seuil de 0,5 : un LightGBM non pondéré atteint le même rappel que la version pondérée (0,771) avec un seuil de 0,31 et une meilleure précision (0,874 contre 0,862). **Les modèles restent donc non pondérés** ; le déséquilibre est traité par la calibration des probabilités et par un seuil de décision fondé sur les coûts (issues suivantes). La pondération pourra être revue comme hyperparamètre au réglage ; XGBoost n'a pas été testé.
+Le taux de défaut est de 21,9 %. Aucune des deux stratégies n'améliore la qualité du classement (la PR AUC est plus basse, sans qu'aucun pli ne s'améliore) et les deux dégradent les probabilités (score de Brier, probabilité moyenne prédite). Elles déplacent seulement le point de fonctionnement au seuil de 0,5 : un LightGBM non pondéré atteint le même rappel que la version pondérée (0,771) avec un seuil de 0,31 et une meilleure précision (0,874 contre 0,862). **Les modèles restent donc non pondérés** ; le déséquilibre est traité par la calibration des probabilités et par un seuil de décision fondé sur les coûts (issues suivantes). La pondération a aussi été proposée à la recherche d'hyperparamètres (voir plus bas) ; XGBoost n'a pas été testé.
+
+### Réglage des hyperparamètres (issue #13)
+
+Recherche Optuna pour le LightGBM retenu : 40 essais (échantillonneur TPE avec graine, premier essai proche de la configuration par défaut), objectif = PR AUC moyenne des mêmes 5 plis du jeu d'entraînement. Script : [`scripts/tune_lightgbm.py`](scripts/tune_lightgbm.py) ; résultats dans [`reports/tuning/`](reports/tuning/). Espace de recherche : nombre d'arbres (100 à 600), taux d'apprentissage (0,02 à 0,2), feuilles (8 à 96), minimum d'échantillons par feuille (5 à 80), sous-échantillonnage des lignes et des colonnes, régularisation L1/L2 et poids de classes.
+
+| | PR AUC |
+|---|---|
+| LightGBM par défaut (validation croisée, mêmes plis) | 0,8998 |
+| meilleur essai de la recherche (mêmes plis) | 0,9020 |
+| gain apparié sur de nouveaux plis (graines 7 et 123) | +0,0021 et +0,0021 (bruit 0,0035 et 0,0038) |
+| jeu de validation, par défaut / réglé | 0,9049 / 0,9071 |
+
+Les 8 meilleurs essais forment un plateau (0,9006 à 0,9020), et le meilleur de 40 est biaisé à la hausse ; le gain a donc été mesuré de nouveau sur des plis que la recherche n'avait pas utilisés : +0,0021, inférieur à l'écart-type des différences appariées. Selon la règle d'adoption utilisée dans tout le projet, **le LightGBM par défaut est conservé** ; les paramètres réglés restent enregistrés dans [`reports/tuning/lightgbm_best_params.json`](reports/tuning/lightgbm_best_params.json). Les hyperparamètres comptent peu sur ce jeu de données. Le jeu de validation a été utilisé une seconde fois, pour ces deux modèles seulement.
+
+![Historique de la recherche Optuna](reports/figures/tuning_history.png)
 
 ## Résultats clés
 
@@ -132,7 +148,7 @@ Pour reproduire les notebooks, télécharge le jeu de données dans `data/raw/` 
 - **Le jeu de données semble synthétique.** Un artefact de construction est documenté plus haut (un ratio qui diffère uniquement sur les défauts), et les scores sont très élevés (ROC AUC autour de 0,95). Une telle performance n'est pas à attendre sur un portefeuille réel.
 - **Pas d'information temporelle :** aucune validation hors période n'est possible. Les chiffres de validation viennent d'un seul découpage stratifié ; la validation croisée sur l'entraînement donne une dispersion entre plis, pas un contrôle externe.
 - **Les hypothèses de coûts** (perte en cas de défaut de 60 %) sont des hypothèses ; le seuil de décision n'est pas encore optimisé.
-- **Les modèles ne sont pas encore réglés ni calibrés** (issues suivantes) ; la pondération des classes et SMOTE ont été testés et non retenus. L'équité n'a pas encore été analysée.
+- **Les probabilités ne sont pas encore calibrées** (issue suivante) ; la pondération des classes, SMOTE et le réglage des hyperparamètres ont été testés et non retenus. L'équité n'a pas encore été analysée.
 
 ## Licence
 
