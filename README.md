@@ -110,6 +110,20 @@ The 8 best trials form a plateau (0.9006 to 0.9020), and the best of 40 is optim
 
 ![Optuna search history](reports/figures/tuning_history.png)
 
+### Probability calibration (issue #14)
+
+Sigmoid (Platt) and isotonic calibration were compared with the uncalibrated LightGBM, by 5-fold cross-validation on the training set; the calibrator is learned on out-of-fold predictions of the base model, so the whole procedure is evaluated on rows it never saw. Full table: [`reports/calibration_comparison.csv`](reports/calibration_comparison.csv).
+
+| Calibration | Brier | Log loss | ECE | Mean predicted | PR AUC |
+|---|---|---|---|---|---|
+| none (reference) | 0.0540 ± 0.0022 | 0.1955 ± 0.0049 | 0.0137 ± 0.0020 | 0.208 | 0.8998 ± 0.0043 |
+| sigmoid | 0.0540 ± 0.0020 | 0.1938 ± 0.0046 | 0.0109 ± 0.0023 | 0.222 | 0.8998 ± 0.0043 |
+| isotonic | 0.0538 ± 0.0018 | 0.1926 ± 0.0061 | 0.0102 ± 0.0012 | 0.222 | 0.8926 ± 0.0048 |
+
+The default rate is 0.219. The uncalibrated model is already reasonably calibrated, and **no calibrator improves the Brier score beyond noise**; isotonic regression has the lowest ECE but lowers the PR AUC by 0.007 on every fold. The sigmoid improves the log loss slightly in cross-validation but not on the validation set, and it corrects some probability ranges while over-correcting others. **No calibrator is applied.** One thing to keep in mind: the model under-estimates low risks (about 0.6% predicted for 1.5% observed in the lowest band), so its output is best read as a good risk score with approximate levels.
+
+![Reliability curves before and after calibration](reports/figures/calibration_curves.png)
+
 ## Key results
 
 _To be completed at the end of the project (AUC-ROC, AUC-PR, KS, estimated financial impact)._
@@ -148,7 +162,7 @@ To reproduce the notebooks, download the dataset into `data/raw/` (see above) an
 - **The dataset looks synthetic.** A construction artifact is documented above (a ratio that differs only on defaults), and the scores are very high (ROC AUC around 0.95). Such performance should not be expected on a real portfolio.
 - **No temporal information:** no out-of-time validation is possible. Validation numbers come from a single stratified split; cross-validation on the training set gives a spread across folds, not an external check.
 - **Cost assumptions** (loss given default of 60%) are assumptions; the decision threshold is not optimized yet.
-- **Probabilities are not calibrated yet** (next issue); class weights, SMOTE and hyperparameter tuning were tested and not kept. Fairness has not been analyzed yet.
+- **Probabilities are reasonably calibrated but not exact:** low risks are under-estimated (about 0.6% predicted for 1.5% observed in the lowest band). Calibration, class weights, SMOTE and hyperparameter tuning were tested and not kept. Fairness has not been analyzed yet.
 
 ## License
 

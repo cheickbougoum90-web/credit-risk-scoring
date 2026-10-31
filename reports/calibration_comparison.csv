@@ -1,0 +1,4 @@
+calibration,brier_mean,log_loss_mean,ece_mean,mean_pred_mean,slope_mean,pr_auc_mean,roc_auc_mean,ks_mean,brier_std,log_loss_std,ece_std,mean_pred_std,slope_std,pr_auc_std,roc_auc_std,ks_std
+none,0.054,0.1955,0.0137,0.2081,0.8865,0.8998,0.9443,0.7521,0.0022,0.0049,0.002,0.0019,0.0201,0.0043,0.0012,0.0115
+sigmoid,0.054,0.1938,0.0109,0.222,1.081,0.8998,0.9443,0.7521,0.002,0.0046,0.0023,0.0015,0.0264,0.0043,0.0012,0.0115
+isotonic,0.0538,0.1926,0.0102,0.2215,1.0791,0.8926,0.9441,0.7496,0.0018,0.0061,0.0012,0.0019,0.0711,0.0048,0.0014,0.0123

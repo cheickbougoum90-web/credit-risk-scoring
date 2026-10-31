@@ -110,6 +110,20 @@ Les 8 meilleurs essais forment un plateau (0,9006 à 0,9020), et le meilleur de 
 
 ![Historique de la recherche Optuna](reports/figures/tuning_history.png)
 
+### Calibration des probabilités (issue #14)
+
+La calibration sigmoïde (Platt) et isotonique a été comparée au LightGBM non calibré, par validation croisée à 5 plis sur le jeu d'entraînement ; le calibrateur est appris sur des prédictions hors pli du modèle de base, donc toute la procédure est évaluée sur des lignes qu'elle n'a jamais vues. Tableau complet : [`reports/calibration_comparison.csv`](reports/calibration_comparison.csv).
+
+| Calibration | Brier | Perte logarithmique | ECE | Probabilité moyenne prédite | PR AUC |
+|---|---|---|---|---|---|
+| aucune (référence) | 0,0540 ± 0,0022 | 0,1955 ± 0,0049 | 0,0137 ± 0,0020 | 0,208 | 0,8998 ± 0,0043 |
+| sigmoïde | 0,0540 ± 0,0020 | 0,1938 ± 0,0046 | 0,0109 ± 0,0023 | 0,222 | 0,8998 ± 0,0043 |
+| isotonique | 0,0538 ± 0,0018 | 0,1926 ± 0,0061 | 0,0102 ± 0,0012 | 0,222 | 0,8926 ± 0,0048 |
+
+Le taux de défaut est de 0,219. Le modèle non calibré est déjà raisonnablement calibré, et **aucun calibrateur n'améliore le score de Brier au-delà du bruit** ; la régression isotonique a l'ECE le plus bas mais fait baisser la PR AUC de 0,007 sur chaque pli. La sigmoïde améliore légèrement la perte logarithmique en validation croisée mais pas sur le jeu de validation, et elle corrige certaines plages de probabilité en en sur-corrigeant d'autres. **Aucun calibrateur n'est appliqué.** À garder en tête : le modèle sous-estime les risques faibles (environ 0,6 % prédit pour 1,5 % observé dans la tranche la plus basse), donc sa sortie se lit mieux comme un bon score de risque aux niveaux approximatifs.
+
+![Courbes de fiabilité avant et après calibration](reports/figures/calibration_curves.png)
+
 ## Résultats clés
 
 _À compléter en fin de projet (AUC-ROC, AUC-PR, KS, impact financier estimé)._
@@ -148,7 +162,7 @@ Pour reproduire les notebooks, télécharge le jeu de données dans `data/raw/` 
 - **Le jeu de données semble synthétique.** Un artefact de construction est documenté plus haut (un ratio qui diffère uniquement sur les défauts), et les scores sont très élevés (ROC AUC autour de 0,95). Une telle performance n'est pas à attendre sur un portefeuille réel.
 - **Pas d'information temporelle :** aucune validation hors période n'est possible. Les chiffres de validation viennent d'un seul découpage stratifié ; la validation croisée sur l'entraînement donne une dispersion entre plis, pas un contrôle externe.
 - **Les hypothèses de coûts** (perte en cas de défaut de 60 %) sont des hypothèses ; le seuil de décision n'est pas encore optimisé.
-- **Les probabilités ne sont pas encore calibrées** (issue suivante) ; la pondération des classes, SMOTE et le réglage des hyperparamètres ont été testés et non retenus. L'équité n'a pas encore été analysée.
+- **Les probabilités sont raisonnablement calibrées mais pas exactes :** les risques faibles sont sous-estimés (environ 0,6 % prédit pour 1,5 % observé dans la tranche la plus basse). La calibration, la pondération des classes, SMOTE et le réglage des hyperparamètres ont été testés et non retenus. L'équité n'a pas encore été analysée.
 
 ## Licence
 

@@ -8,10 +8,12 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score,
     brier_score_loss,
     confusion_matrix,
+    log_loss,
     precision_recall_curve,
     precision_score,
     recall_score,
@@ -78,6 +80,50 @@ def precision_at_recall(y_true, y_score, recall_target: float = 0.8) -> float:
         raise ValueError("recall_target must be in (0, 1]")
     precision, recall, _ = precision_recall_curve(y_true, y_score)
     return float(precision[recall >= recall_target].max())
+
+
+def calibration_table(y_true, y_prob, n_bins: int = 10) -> pd.DataFrame:
+    """Reliability table with equal-size (quantile) bins: mean predicted vs observed default rate."""
+    y_true, y_prob = _validate(y_true, y_prob)
+    order = np.argsort(y_prob, kind="mergesort")
+    rows = []
+    for idx in np.array_split(order, n_bins):
+        if len(idx) == 0:
+            continue
+        rows.append(
+            {
+                "mean_predicted": float(y_prob[idx].mean()),
+                "observed_rate": float(y_true[idx].mean()),
+                "n": int(len(idx)),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def expected_calibration_error(y_true, y_prob, n_bins: int = 10) -> float:
+    """ECE with equal-size bins: weighted mean gap between predicted and observed rates."""
+    table = calibration_table(y_true, y_prob, n_bins)
+    weights = table["n"] / table["n"].sum()
+    return float((weights * (table["mean_predicted"] - table["observed_rate"]).abs()).sum())
+
+
+def calibration_slope_intercept(y_true, y_prob) -> tuple[float, float]:
+    """Slope and intercept of a logistic regression of the outcome on logit(p).
+
+    A perfectly calibrated model has slope 1 and intercept 0. A slope below 1 means the
+    predictions are too extreme; the intercept captures a global over- or under-estimation.
+    """
+    y_true, y_prob = _validate(y_true, y_prob)
+    p = np.clip(y_prob, 1e-6, 1 - 1e-6)
+    logit = np.log(p / (1 - p)).reshape(-1, 1)
+    lr = LogisticRegression(C=1e6, max_iter=1000).fit(logit, y_true)
+    return float(lr.coef_[0][0]), float(lr.intercept_[0])
+
+
+def safe_log_loss(y_true, y_prob) -> float:
+    """Log loss with probabilities clipped away from 0 and 1."""
+    y_true, y_prob = _validate(y_true, y_prob)
+    return float(log_loss(y_true, np.clip(y_prob, 1e-15, 1 - 1e-15), labels=[0, 1]))
 
 
 def update_comparison_table(
