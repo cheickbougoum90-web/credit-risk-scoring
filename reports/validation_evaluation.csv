@@ -1,0 +1,15 @@
+model,metric,estimate,ci_low,ci_high
+lightgbm,roc_auc,0.9459,0.9381,0.9528
+lightgbm,pr_auc,0.9049,0.8926,0.9155
+lightgbm,ks,0.7595,0.7406,0.7812
+lightgbm,brier,0.0514,0.0472,0.0559
+lightgbm,recall,0.7525,0.7298,0.7741
+lightgbm,precision,0.9544,0.9409,0.9656
+lightgbm,precision_at_recall80,0.8341,0.7764,0.8885
+logistic,roc_auc,0.8779,0.8668,0.8875
+logistic,pr_auc,0.7261,0.7018,0.7469
+logistic,ks,0.6089,0.5885,0.6349
+logistic,brier,0.1029,0.0985,0.1083
+logistic,recall,0.5501,0.5243,0.5748
+logistic,precision,0.7436,0.715,0.7703
+logistic,precision_at_recall80,0.5245,0.4957,0.564

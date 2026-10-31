@@ -124,6 +124,24 @@ The default rate is 0.219. The uncalibrated model is already reasonably calibrat
 
 ![Reliability curves before and after calibration](reports/figures/calibration_curves.png)
 
+### Evaluation of the final model (issue #15)
+
+Final model (default LightGBM, no calibrator) fitted on the training set and evaluated on the **validation set** (6,482 customers, 1,418 defaults), with 95% bootstrap intervals (1,000 resamples; both models are scored on the same resampled rows, so the difference has a paired interval). Full tables: [`reports/validation_evaluation.csv`](reports/validation_evaluation.csv) and [`reports/validation_differences.csv`](reports/validation_differences.csv). The test set has not been used.
+
+| Metric | LightGBM [95% CI] | Logistic regression [95% CI] | Difference [95% CI] |
+|---|---|---|---|
+| ROC AUC | 0.946 [0.938, 0.953] | 0.878 [0.867, 0.887] | +0.068 [+0.060, +0.077] |
+| PR AUC | 0.905 [0.893, 0.915] | 0.726 [0.702, 0.747] | +0.179 [+0.161, +0.198] |
+| KS | 0.759 [0.741, 0.781] | 0.609 [0.589, 0.635] | +0.151 [+0.128, +0.172] |
+| Brier score (lower is better) | 0.0514 [0.0472, 0.0559] | 0.1029 [0.0985, 0.1083] | -0.0516 [-0.0553, -0.0478] |
+| Recall at 0.5 | 0.752 [0.730, 0.774] | 0.550 [0.524, 0.575] | +0.202 [+0.178, +0.228] |
+| Precision at 0.5 | 0.954 [0.941, 0.966] | 0.744 [0.715, 0.770] | +0.211 [+0.185, +0.237] |
+| Precision at 80% recall | 0.834 [0.776, 0.888] | 0.524 [0.496, 0.564] | +0.310 [+0.258, +0.351] |
+
+At the 0.5 reference threshold, 1,067 of the 1,418 defaults are caught and 351 are missed, while 51 of the 5,064 good customers are refused (1.0%). Since a missed default is assumed to cost about five times more than a refused good customer, a lower threshold will probably be cheaper; it is chosen from the cost matrix in a later issue. LightGBM is ahead of the logistic regression on every metric in all 1,000 resamples.
+
+![ROC curve, precision-recall curve and score distribution](reports/figures/final_evaluation.png)
+
 ## Key results
 
 _To be completed at the end of the project (AUC-ROC, AUC-PR, KS, estimated financial impact)._
@@ -161,6 +179,7 @@ To reproduce the notebooks, download the dataset into `data/raw/` (see above) an
 
 - **The dataset looks synthetic.** A construction artifact is documented above (a ratio that differs only on defaults), and the scores are very high (ROC AUC around 0.95). Such performance should not be expected on a real portfolio.
 - **No temporal information:** no out-of-time validation is possible. Validation numbers come from a single stratified split; cross-validation on the training set gives a spread across folds, not an external check.
+- **The validation set has been used for several model comparisons**, so its confidence intervals reflect sampling noise only and not selection optimism. The test set, untouched so far, will give the final unbiased estimate.
 - **Cost assumptions** (loss given default of 60%) are assumptions; the decision threshold is not optimized yet.
 - **Probabilities are reasonably calibrated but not exact:** low risks are under-estimated (about 0.6% predicted for 1.5% observed in the lowest band). Calibration, class weights, SMOTE and hyperparameter tuning were tested and not kept. Fairness has not been analyzed yet.
 

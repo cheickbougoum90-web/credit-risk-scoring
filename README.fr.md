@@ -124,6 +124,24 @@ Le taux de défaut est de 0,219. Le modèle non calibré est déjà raisonnablem
 
 ![Courbes de fiabilité avant et après calibration](reports/figures/calibration_curves.png)
 
+### Évaluation du modèle final (issue #15)
+
+Modèle final (LightGBM par défaut, sans calibrateur) ajusté sur le jeu d'entraînement et évalué sur le **jeu de validation** (6 482 clients, 1 418 défauts), avec des intervalles de confiance à 95 % par bootstrap (1 000 rééchantillonnages ; les deux modèles sont évalués sur les mêmes lignes rééchantillonnées, donc l'écart a un intervalle apparié). Tableaux complets : [`reports/validation_evaluation.csv`](reports/validation_evaluation.csv) et [`reports/validation_differences.csv`](reports/validation_differences.csv). Le jeu de test n'a pas été utilisé.
+
+| Métrique | LightGBM [IC 95 %] | Régression logistique [IC 95 %] | Écart [IC 95 %] |
+|---|---|---|---|
+| ROC AUC | 0,946 [0,938, 0,953] | 0,878 [0,867, 0,887] | +0,068 [+0,060, +0,077] |
+| PR AUC | 0,905 [0,893, 0,915] | 0,726 [0,702, 0,747] | +0,179 [+0,161, +0,198] |
+| KS | 0,759 [0,741, 0,781] | 0,609 [0,589, 0,635] | +0,151 [+0,128, +0,172] |
+| Score de Brier (plus bas = mieux) | 0,0514 [0,0472, 0,0559] | 0,1029 [0,0985, 0,1083] | -0,0516 [-0,0553, -0,0478] |
+| Rappel à 0,5 | 0,752 [0,730, 0,774] | 0,550 [0,524, 0,575] | +0,202 [+0,178, +0,228] |
+| Précision à 0,5 | 0,954 [0,941, 0,966] | 0,744 [0,715, 0,770] | +0,211 [+0,185, +0,237] |
+| Précision à 80 % de rappel | 0,834 [0,776, 0,888] | 0,524 [0,496, 0,564] | +0,310 [+0,258, +0,351] |
+
+Au seuil de référence de 0,5, 1 067 des 1 418 défauts sont détectés et 351 sont manqués, tandis que 51 des 5 064 bons clients sont refusés (1,0 %). Comme un défaut manqué est supposé coûter environ cinq fois plus qu'un bon client refusé, un seuil plus bas sera probablement moins coûteux ; il sera choisi à partir de la matrice de coûts dans une issue suivante. LightGBM devance la régression logistique sur chaque métrique dans les 1 000 rééchantillonnages.
+
+![Courbe ROC, courbe précision-rappel et distribution des scores](reports/figures/final_evaluation.png)
+
 ## Résultats clés
 
 _À compléter en fin de projet (AUC-ROC, AUC-PR, KS, impact financier estimé)._
@@ -161,6 +179,7 @@ Pour reproduire les notebooks, télécharge le jeu de données dans `data/raw/` 
 
 - **Le jeu de données semble synthétique.** Un artefact de construction est documenté plus haut (un ratio qui diffère uniquement sur les défauts), et les scores sont très élevés (ROC AUC autour de 0,95). Une telle performance n'est pas à attendre sur un portefeuille réel.
 - **Pas d'information temporelle :** aucune validation hors période n'est possible. Les chiffres de validation viennent d'un seul découpage stratifié ; la validation croisée sur l'entraînement donne une dispersion entre plis, pas un contrôle externe.
+- **Le jeu de validation a servi à plusieurs comparaisons de modèles** : ses intervalles de confiance reflètent seulement le bruit d'échantillonnage, pas l'optimisme de la sélection. Le jeu de test, intact jusqu'ici, donnera l'estimation finale non biaisée.
 - **Les hypothèses de coûts** (perte en cas de défaut de 60 %) sont des hypothèses ; le seuil de décision n'est pas encore optimisé.
 - **Les probabilités sont raisonnablement calibrées mais pas exactes :** les risques faibles sont sous-estimés (environ 0,6 % prédit pour 1,5 % observé dans la tranche la plus basse). La calibration, la pondération des classes, SMOTE et le réglage des hyperparamètres ont été testés et non retenus. L'équité n'a pas encore été analysée.
 
