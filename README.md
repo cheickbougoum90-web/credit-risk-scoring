@@ -138,9 +138,24 @@ Final model (default LightGBM, no calibrator) fitted on the training set and eva
 | Precision at 0.5 | 0.954 [0.941, 0.966] | 0.744 [0.715, 0.770] | +0.211 [+0.185, +0.237] |
 | Precision at 80% recall | 0.834 [0.776, 0.888] | 0.524 [0.496, 0.564] | +0.310 [+0.258, +0.351] |
 
-At the 0.5 reference threshold, 1,067 of the 1,418 defaults are caught and 351 are missed, while 51 of the 5,064 good customers are refused (1.0%). Since a missed default is assumed to cost about five times more than a refused good customer, a lower threshold will probably be cheaper; it is chosen from the cost matrix in a later issue. LightGBM is ahead of the logistic regression on every metric in all 1,000 resamples.
+At the 0.5 reference threshold, 1,067 of the 1,418 defaults are caught and 351 are missed, while 51 of the 5,064 good customers are refused (1.0%). Since a missed default is assumed to cost about five times more than a refused good customer, a lower threshold is cheaper; it is chosen from the cost matrix in the next section. LightGBM is ahead of the logistic regression on every metric in all 1,000 resamples.
 
 ![ROC curve, precision-recall curve and score distribution](reports/figures/final_evaluation.png)
+
+### Decision threshold (issue #16)
+
+The threshold is chosen from the cost matrix: accepting a loan that ends in default costs 60% of the loan amount, and refusing a customer who would have repaid costs the interest income (loan amount times interest rate, one-year proxy). It is selected on **out-of-fold predictions of the training set** (lowest total cost), then evaluated **once** on the validation set, with 95% bootstrap intervals. Full tables: [`reports/threshold_evaluation.csv`](reports/threshold_evaluation.csv), [`reports/threshold_sensitivity.csv`](reports/threshold_sensitivity.csv); the value is stored in [`reports/decision_threshold.json`](reports/decision_threshold.json).
+
+| Policy (validation set) | Customers refused | Defaults refused | Good customers refused | Cost per customer | Cost reduction vs no model [95% CI] |
+|---|---|---|---|---|---|
+| accept everybody (no model) | 0.0% | 0.0% | 0.0% | 1,418 | 0% |
+| **threshold 0.22 (selected)** | 22.2% | 81.4% | 5.7% | 277 | 80.5% [78.2%, 82.5%] |
+| threshold 0.5 (naive) | 17.2% | 75.2% | 1.0% | 303 | 78.7% [76.2%, 81.0%] |
+| customer-specific cut-off (theory) | 25.4% | 83.9% | 9.1% | 275 | 80.6% [78.3%, 82.6%] |
+
+**The selected threshold is 0.22**, against the naive 0.5: it saves another 1.8% of the no-model cost [0.5%, 3.2%] and is cheaper in 99.6% of the bootstrap resamples. The cost curve is flat around its optimum (every value from 0.15 to 0.24 is within 1% of the minimum, and the optimum found in each fold ranges from 0.095 to 0.235), so what matters is being in that zone rather than at 0.5. The customer-specific cut-off that the cost matrix implies for perfectly calibrated probabilities does no better within noise, so a single threshold is enough. The threshold depends on the cost assumptions: it moves from 0.235 to 0.095 for a loss given default between 40% and 80%, and keeping 0.22 loses at most 0.5 points of cost reduction in those scenarios, but 3.4 points if a missed default costs 10 times a refused customer. Accepting everybody is a weak reference, so the 80% reduction is large by construction; the comparison that matters is 0.22 against 0.5.
+
+![Cost curve and effect of the threshold](reports/figures/threshold_cost_curve.png)
 
 ## Key results
 
@@ -180,7 +195,7 @@ To reproduce the notebooks, download the dataset into `data/raw/` (see above) an
 - **The dataset looks synthetic.** A construction artifact is documented above (a ratio that differs only on defaults), and the scores are very high (ROC AUC around 0.95). Such performance should not be expected on a real portfolio.
 - **No temporal information:** no out-of-time validation is possible. Validation numbers come from a single stratified split; cross-validation on the training set gives a spread across folds, not an external check.
 - **The validation set has been used for several model comparisons**, so its confidence intervals reflect sampling noise only and not selection optimism. The test set, untouched so far, will give the final unbiased estimate.
-- **Cost assumptions** (loss given default of 60%) are assumptions; the decision threshold is not optimized yet.
+- **Cost assumptions** (loss given default of 60%, one-year interest proxy, no recoveries or funding costs) are assumptions. The threshold is optimized for them and must be revisited if the real costs are much more lopsided.
 - **Probabilities are reasonably calibrated but not exact:** low risks are under-estimated (about 0.6% predicted for 1.5% observed in the lowest band). Calibration, class weights, SMOTE and hyperparameter tuning were tested and not kept. Fairness has not been analyzed yet.
 
 ## License

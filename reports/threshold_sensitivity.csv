@@ -1,0 +1,7 @@
+scenario,re-optimized threshold,reduction with it,reduction with 0.22,reduction with 0.5
+loss given default 40%,0.235,0.789882,0.785021,0.781683
+loss given default 60%,0.22,0.804586,0.804586,0.786518
+loss given default 80%,0.095,0.8132,0.814369,0.788935
+unit costs 3:1,0.245,0.747767,0.746356,0.74048
+unit costs 5:1,0.15,0.77574,0.773343,0.745275
+unit costs 10:1,0.075,0.827856,0.793583,0.748872

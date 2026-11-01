@@ -1,0 +1,7 @@
+{
+  "threshold": 0.22,
+  "rule": "refuse if predicted default probability >= threshold",
+  "chosen_on": "out-of-fold predictions of the training set",
+  "loss_given_default": 0.6,
+  "false_positive_cost": "loan amount x interest rate (one-year proxy)"
+}

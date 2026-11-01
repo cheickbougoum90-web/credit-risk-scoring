@@ -10,12 +10,16 @@ Issue 13: Optuna tuning gave no gain beyond noise on folds not used by the searc
 Issue 14: neither sigmoid nor isotonic calibration beats the Brier score of the
           uncalibrated model beyond noise (isotonic also hurts the ranking), so no
           calibrator is applied.
+Issue 16: decision threshold chosen from the cost matrix on out-of-fold training
+          predictions (see notebook 03): customers with a predicted default probability
+          at or above DECISION_THRESHOLD are refused.
 """
 from src.models.calibration import build_calibrated_model
 from src.models.zoo import RANDOM_STATE
 
 FINAL_MODEL_NAME = "lightgbm"
 FINAL_CALIBRATION = "none"
+DECISION_THRESHOLD = 0.22
 
 
 def build_final_model(n_jobs: int = -1, random_state: int = RANDOM_STATE):

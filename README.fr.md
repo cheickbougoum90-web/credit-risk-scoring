@@ -138,9 +138,24 @@ Modèle final (LightGBM par défaut, sans calibrateur) ajusté sur le jeu d'entr
 | Précision à 0,5 | 0,954 [0,941, 0,966] | 0,744 [0,715, 0,770] | +0,211 [+0,185, +0,237] |
 | Précision à 80 % de rappel | 0,834 [0,776, 0,888] | 0,524 [0,496, 0,564] | +0,310 [+0,258, +0,351] |
 
-Au seuil de référence de 0,5, 1 067 des 1 418 défauts sont détectés et 351 sont manqués, tandis que 51 des 5 064 bons clients sont refusés (1,0 %). Comme un défaut manqué est supposé coûter environ cinq fois plus qu'un bon client refusé, un seuil plus bas sera probablement moins coûteux ; il sera choisi à partir de la matrice de coûts dans une issue suivante. LightGBM devance la régression logistique sur chaque métrique dans les 1 000 rééchantillonnages.
+Au seuil de référence de 0,5, 1 067 des 1 418 défauts sont détectés et 351 sont manqués, tandis que 51 des 5 064 bons clients sont refusés (1,0 %). Comme un défaut manqué est supposé coûter environ cinq fois plus qu'un bon client refusé, un seuil plus bas est moins coûteux ; il est choisi à partir de la matrice de coûts dans la section suivante. LightGBM devance la régression logistique sur chaque métrique dans les 1 000 rééchantillonnages.
 
 ![Courbe ROC, courbe précision-rappel et distribution des scores](reports/figures/final_evaluation.png)
+
+### Seuil de décision (issue #16)
+
+Le seuil est choisi à partir de la matrice de coûts : accepter un prêt qui finit en défaut coûte 60 % du montant, et refuser un client qui aurait remboursé coûte les intérêts perdus (montant du prêt multiplié par le taux, approximation sur un an). Il est sélectionné sur les **prédictions hors pli du jeu d'entraînement** (coût total le plus bas), puis évalué **une seule fois** sur le jeu de validation, avec des intervalles de confiance à 95 % par bootstrap. Tableaux complets : [`reports/threshold_evaluation.csv`](reports/threshold_evaluation.csv), [`reports/threshold_sensitivity.csv`](reports/threshold_sensitivity.csv) ; la valeur est enregistrée dans [`reports/decision_threshold.json`](reports/decision_threshold.json).
+
+| Politique (jeu de validation) | Clients refusés | Défauts refusés | Bons clients refusés | Coût par client | Réduction du coût vs sans modèle [IC 95 %] |
+|---|---|---|---|---|---|
+| tout accepter (sans modèle) | 0,0 % | 0,0 % | 0,0 % | 1 418 | 0 % |
+| **seuil 0,22 (retenu)** | 22,2 % | 81,4 % | 5,7 % | 277 | 80,5 % [78,2 ; 82,5] |
+| seuil 0,5 (naïf) | 17,2 % | 75,2 % | 1,0 % | 303 | 78,7 % [76,2 ; 81,0] |
+| seuil propre à chaque client (théorique) | 25,4 % | 83,9 % | 9,1 % | 275 | 80,6 % [78,3 ; 82,6] |
+
+**Le seuil retenu est 0,22**, contre 0,5 en version naïve : il économise encore 1,8 % du coût sans modèle [0,5 % ; 3,2 %] et coûte moins cher dans 99,6 % des rééchantillonnages. La courbe de coût est plate autour de l'optimum (toute valeur de 0,15 à 0,24 reste à moins de 1 % du minimum, et l'optimum trouvé dans chaque pli va de 0,095 à 0,235) : l'essentiel est d'être dans cette zone plutôt qu'à 0,5. Le seuil propre à chaque client que la matrice de coûts implique pour des probabilités parfaitement calibrées ne fait pas mieux, aux erreurs d'échantillonnage près : un seul seuil suffit. Le seuil dépend des hypothèses de coût : il passe de 0,235 à 0,095 pour une perte en cas de défaut de 40 % à 80 %, et garder 0,22 fait perdre au plus 0,5 point de réduction de coût dans ces scénarios, mais 3,4 points si un défaut manqué coûte 10 fois un client refusé. Tout accepter est une référence faible, donc la réduction de 80 % est grande par construction ; la comparaison qui compte est 0,22 contre 0,5.
+
+![Courbe de coût et effet du seuil](reports/figures/threshold_cost_curve.png)
 
 ## Résultats clés
 
@@ -180,7 +195,7 @@ Pour reproduire les notebooks, télécharge le jeu de données dans `data/raw/` 
 - **Le jeu de données semble synthétique.** Un artefact de construction est documenté plus haut (un ratio qui diffère uniquement sur les défauts), et les scores sont très élevés (ROC AUC autour de 0,95). Une telle performance n'est pas à attendre sur un portefeuille réel.
 - **Pas d'information temporelle :** aucune validation hors période n'est possible. Les chiffres de validation viennent d'un seul découpage stratifié ; la validation croisée sur l'entraînement donne une dispersion entre plis, pas un contrôle externe.
 - **Le jeu de validation a servi à plusieurs comparaisons de modèles** : ses intervalles de confiance reflètent seulement le bruit d'échantillonnage, pas l'optimisme de la sélection. Le jeu de test, intact jusqu'ici, donnera l'estimation finale non biaisée.
-- **Les hypothèses de coûts** (perte en cas de défaut de 60 %) sont des hypothèses ; le seuil de décision n'est pas encore optimisé.
+- **Les hypothèses de coûts** (perte en cas de défaut de 60 %, approximation des intérêts sur un an, ni recouvrements ni coûts de financement) sont des hypothèses. Le seuil est optimisé pour elles et doit être revu si les vrais coûts sont beaucoup plus déséquilibrés.
 - **Les probabilités sont raisonnablement calibrées mais pas exactes :** les risques faibles sont sous-estimés (environ 0,6 % prédit pour 1,5 % observé dans la tranche la plus basse). La calibration, la pondération des classes, SMOTE et le réglage des hyperparamètres ont été testés et non retenus. L'équité n'a pas encore été analysée.
 
 ## Licence

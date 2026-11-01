@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from src.features.preprocessing import get_xy
-from src.models.final import FINAL_CALIBRATION, FINAL_MODEL_NAME, build_final_model
+from src.models.final import DECISION_THRESHOLD, FINAL_CALIBRATION, FINAL_MODEL_NAME, build_final_model
 from src.models.zoo import MODEL_NAMES, build_model
 from tests.test_baseline import synthetic
 
@@ -26,3 +26,7 @@ def test_without_calibrator_the_final_model_is_the_plain_selected_model():
     final = build_final_model(n_jobs=1).fit(X.iloc[:1000], y.iloc[:1000]).predict_proba(X.iloc[1000:])
     if FINAL_CALIBRATION == "none":
         assert np.allclose(plain, final)
+
+
+def test_decision_threshold_is_a_probability_below_the_naive_half():
+    assert 0.0 < DECISION_THRESHOLD < 0.5   # a missed default costs more than a refused good customer

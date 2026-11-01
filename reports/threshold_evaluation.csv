@@ -1,0 +1,5 @@
+policy,refusal rate,defaults refused,good refused,cost per customer,reduction,ci_low,ci_high
+accept everybody (no model),0.0,0.0,0.0,1418.219685,0.0,,
+threshold 0.22 (selected),0.222308,0.813822,0.056675,277.139464,0.804586,0.781783,0.825257
+threshold 0.5 (naive),0.172478,0.752468,0.010071,302.7646,0.786518,0.762437,0.809903
+customer-specific cut-off (theory),0.254397,0.838505,0.090837,274.907549,0.80616,0.783004,0.826153
