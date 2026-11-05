@@ -157,6 +157,18 @@ Le seuil est choisi à partir de la matrice de coûts : accepter un prêt qui fi
 
 ![Courbe de coût et effet du seuil](reports/figures/threshold_cost_curve.png)
 
+### Expliquer le modèle (issue #17)
+
+SHAP décompose chaque prédiction en une contribution par variable, en log-cotes (une contribution positive pousse la probabilité de défaut vers le haut). Les contributions des colonnes one-hot sont regroupées sur la variable d'origine, pour que les explications se lisent comme le formulaire de demande. Il décrit **le modèle**, pas des causes dans la réalité. Calculé sur le jeu de validation avec le modèle final ; le code est réutilisable par l'API ([`src/models/explain.py`](src/models/explain.py) : `Explainer.top_factors` renvoie les trois principaux facteurs d'une décision). Tableaux et figures : [`reports/shap_importance.csv`](reports/shap_importance.csv), [`reports/figures/`](reports/figures/).
+
+- **Six variables portent 89 % des explications :** rapport montant/revenu (19,5 %), logement (16,4 %), note du prêt (15,2 %), revenu annuel (14,4 %), but du prêt (12,0 %) et taux d'intérêt (11,2 %). Un contrôle par permutation classe les quatre mêmes en tête.
+- **Les effets sont tranchés.** Un rapport montant/revenu supérieur à 0,3 ajoute +4,25 log-cotes ou plus (les cotes multipliées par environ 70), une note de prêt D ou pire ajoute de +2,6 à +5,7, et être propriétaire réduit fortement le risque (-5,2).
+- **Le défaut passé est presque inutilisé** car il est redondant avec la note du prêt : à note égale, le taux de défaut est le même avec ou sans défaut passé (note D : 58,6 % sans, 60,5 % avec). Le taux d'intérêt est presque une reformulation de la note (corrélation de rang 0,95).
+- **Les 264 défauts manqués au seuil de 0,22 ressemblent à de bons clients.** 89 % d'entre eux ont une note A à C et seulement 6 % ont un rapport montant/revenu supérieur à 0,3, contre 47 % des défauts détectés. Leurs dossiers portent peu de risque sur les variables disponibles, ce qui suggère qu'on ne peut pas les distinguer de bons clients avec ces données (hypothèse) ; un seuil plus bas en détecterait davantage au prix de nombreux bons clients refusés.
+- **Les effets les plus tranchés (la falaise à 0,3, le logement) suggèrent un jeu de données artificiel** : il ne faut pas les lire comme des constats sur de vrais emprunteurs.
+
+![Quatre clients expliqués : accepté, refusé, défaut manqué, cas limite](reports/figures/shap_local_examples.png)
+
 ## Résultats clés
 
 _À compléter en fin de projet (AUC-ROC, AUC-PR, KS, impact financier estimé)._

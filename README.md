@@ -157,6 +157,18 @@ The threshold is chosen from the cost matrix: accepting a loan that ends in defa
 
 ![Cost curve and effect of the threshold](reports/figures/threshold_cost_curve.png)
 
+### Explaining the model (issue #17)
+
+SHAP splits each prediction into one contribution per variable, in log-odds (a positive contribution pushes the default probability up). The contributions of one-hot columns are summed back to the original variable, so explanations read like the application form. It describes **the model**, not real-world causes. Computed on the validation set with the final model; the code is reusable by the API ([`src/models/explain.py`](src/models/explain.py): `Explainer.top_factors` returns the three main factors of a decision). Tables and figures: [`reports/shap_importance.csv`](reports/shap_importance.csv), [`reports/figures/`](reports/figures/).
+
+- **Six variables carry 89% of the explanations:** loan-to-income ratio (19.5%), home ownership (16.4%), loan grade (15.2%), annual income (14.4%), loan purpose (12.0%) and interest rate (11.2%). A permutation cross-check ranks the same four first.
+- **The effects are sharp.** A loan-to-income ratio above 0.3 adds +4.25 log-odds or more (the odds multiplied by about 70), a loan grade of D or worse adds +2.6 to +5.7, and owning a home lowers the risk strongly (-5.2).
+- **The past-default flag is almost unused** because it is redundant with the loan grade: within a grade, the default rate is the same with or without a past default (grade D: 58.6% without, 60.5% with). The interest rate is almost a restatement of the grade (rank correlation 0.95).
+- **The 264 defaults missed at the 0.22 threshold look like good customers.** 89% of them have a grade A to C and only 6% have a loan-to-income ratio above 0.3, against 47% of the defaults that are caught. Their files carry little risk on the available variables, which suggests they cannot be told apart from good customers with this data (a hypothesis); a lower threshold would catch more of them at the price of many refused good customers.
+- **The sharpest effects (the 0.3 cliff, home ownership) suggest an artificial dataset**: they should not be read as findings about real borrowers.
+
+![Four customers explained: accepted, refused, missed default, borderline](reports/figures/shap_local_examples.png)
+
 ## Key results
 
 _To be completed at the end of the project (AUC-ROC, AUC-PR, KS, estimated financial impact)._

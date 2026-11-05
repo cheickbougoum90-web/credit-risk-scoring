@@ -1,0 +1,12 @@
+column,variable,mean_abs_shap,share
+loan_to_income,Loan-to-income ratio,1.1393,0.1946
+person_home_ownership,Home ownership,0.9628,0.1645
+loan_grade,Loan grade,0.8906,0.1522
+person_income,Annual income,0.8408,0.1436
+loan_intent,Loan purpose,0.7007,0.1197
+loan_int_rate,Interest rate,0.6532,0.1116
+person_emp_length,Employment length,0.1924,0.0329
+loan_amnt,Loan amount,0.1843,0.0315
+person_age,Age,0.1796,0.0307
+cb_person_cred_hist_length,Credit history length,0.0903,0.0154
+cb_person_default_on_file,Past default on file,0.0192,0.0033
